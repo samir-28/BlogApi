@@ -18,13 +18,16 @@ class BlogViewSet(ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.is_admin:
+        if not user.is_authenticated:
+            return Blog.objects.none()
+
+        if getattr(user, "is_admin", False):
             return Blog.objects.all()
 
-        if user.is_author:
+        if getattr(user, "is_author", False):
             return Blog.objects.filter(author=user)
 
-        if user.is_reader:
+        if getattr(user, "is_reader", False):
             return Blog.objects.filter(is_published=True)
 
         return Blog.objects.none()
@@ -33,7 +36,7 @@ class BlogViewSet(ModelViewSet):
     def publish(self, request, pk=None):
         blog = self.get_object()
 
-        if not request.user.is_admin:
+        if not getattr(request.user, "is_admin", False):
             return Response(
                 {"detail": "Only admin can publish"},
                 status=status.HTTP_403_FORBIDDEN
@@ -45,6 +48,10 @@ class BlogViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def my_blogs(self, request):
+       
+        if not request.user.is_authenticated:
+            return Response([])
+
         blogs = Blog.objects.filter(author=request.user)
         serializer = self.get_serializer(blogs, many=True)
         return Response(serializer.data)
